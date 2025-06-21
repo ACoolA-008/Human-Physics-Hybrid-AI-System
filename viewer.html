@@ -3,8 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <title>3D MRMS Point Cloud Viewer</title>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css' rel='stylesheet' />
   <style>
-    body { margin: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    #main-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    #threeContainer, #mapContainer {
+      width: 50%;
+      height: 100%;
+    }
+    #threeContainer {
+      position: relative; /* Needed for positioning children */
+    }
     #tooltip {
       position: absolute;
       display: none;
@@ -14,6 +33,7 @@
       border-radius: 5px;
       font-family: sans-serif;
       pointer-events: none; /* So it doesn't block mouse events */
+      z-index: 10;
     }
     #instructions {
       position: absolute;
@@ -25,6 +45,7 @@
       border-radius: 5px;
       font-family: sans-serif;
       display: none; /* Hidden by default */
+      z-index: 10;
     }
     .annotation-label {
       position: absolute;
@@ -36,146 +57,256 @@
       font-size: 14px;
       pointer-events: none;
       transform: translate(-50%, -120%); /* Position above the center point */
+      z-index: 10;
     }
   </style>
 </head>
 <body>
-<div id="tooltip"></div>
-<div id="instructions"></div>
-<div id="labels-container"></div>
+<div id="main-container">
+  <div id="threeContainer">
+    <div id="tooltip"></div>
+    <div id="instructions"></div>
+    <div id="labels-container"></div>
+  </div>
+  <div id="mapContainer"></div>
+</div>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js'></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <script>
-let allPoints = []; // To store the raw point data for inspection
-fetch('mrms_point_cloud.json')
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Failed to load mrms_point_cloud.json: ' + response.status);
+  // --- Global Variables ---
+  let allPoints = [];
+  let metadata = {}; // <-- Will hold our radar metadata
+  let map; // <-- Will hold the map object
+  let nextAnnotationId = 0; // Simple ID generator for map features
+  let controls; // <-- Make controls globally accessible
+  let pointCloud;
+  let gridHelper;
+  
+  // --- Core Scene Setup ---
+  const threeContainer = document.getElementById('threeContainer');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 10000);
+  camera.position.set(0, 0, 500);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
+  threeContainer.appendChild(renderer.domElement);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  gridHelper = new THREE.GridHelper(1000, 20);
+  scene.add(gridHelper);
+
+  // --- GUI Setup ---
+  const gui = new lil.GUI({ container: threeContainer });
+  const params = {
+    pointSize: 2,
+    opacity: 1.0,
+    color: 0xffffff,
+    startAnnotation: startAnnotation,
+    saveAnnotations: saveAnnotations,
+  };
+  gui.add(params, 'pointSize', 0.1, 10).onChange(value => {
+    material.size = value;
+  });
+  gui.add(params, 'opacity', 0, 1).onChange(value => {
+    material.opacity = value;
+  });
+  gui.addColor(params, 'color').onChange(value => {
+    material.color.set(value);
+    material.vertexColors = false;
+  });
+  gui.add(params, 'startAnnotation').name('Start Annotation');
+  gui.add(params, 'saveAnnotations').name('Save Annotations');
+
+  const editFolder = gui.addFolder('Edit Annotation');
+  const editParams = { description: '', delete: deleteSelectedAnnotation };
+  const descriptionController = editFolder.add(editParams, 'description').name('Description');
+  descriptionController.onChange(value => {
+    if (selectedAnnotation) {
+      selectedAnnotation.description = value;
+      selectedAnnotation.labelElement.textContent = value;
     }
-    return response.json();
-  })
-  .then(points => {
-    allPoints = points;
-    if (!Array.isArray(points) || points.length === 0) {
-      console.error('Point cloud JSON is empty or not an array.');
-      document.body.innerHTML = '<h2>Error: Point cloud JSON is empty or not an array.</h2>';
-      return;
-    }
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 10000);
-    camera.position.set(0, 0, 500);
+  });
+  editFolder.add(editParams, 'delete').name('Delete Selected');
+  editFolder.hide();
 
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+  // --- Point Inspection & Annotation Setup ---
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 3;
+  const mouse = new THREE.Vector2();
+  const tooltip = document.getElementById('tooltip');
+  const highlightGeo = new THREE.SphereGeometry(5);
+  const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+  const highlightMarker = new THREE.Mesh(highlightGeo, highlightMat);
+  highlightMarker.visible = false;
+  scene.add(highlightMarker);
 
-    // Controls
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  let annotationState = 'idle';
+  let corner1 = new THREE.Vector3();
+  let currentBBoxHelper = null;
+  const annotations = [];
+  const annotationHitboxes = [];
+  const instructions = document.getElementById('instructions');
+  const labelsContainer = document.getElementById('labels-container');
+  let selectedAnnotation = null;
 
-    // Geometry
-    const geometry = new THREE.BufferGeometry();
-    const positions = [];
-    const colors = [];
-    points.forEach(pt => {
-      positions.push(pt.x, pt.y, pt.z);
-      // Color by reflectivity (simple mapping)
-      const norm = Math.min(Math.max((pt.reflectivity + 10) / 60, 0), 1);
-      const color = new THREE.Color().setHSL(0.7 - norm * 0.7, 1, 0.5);
-      colors.push(color.r, color.g, color.b);
+  // --- NEW: Mapbox Viewer Initialization ---
+  mapboxgl.accessToken = 'pk.eyJ1IjoiYWNvb2xhMDA4IiwiYSI6ImNtYzVzaWg3NjBza2sybnB0M3BlaGk3N28ifQ.MQcLcmFS08WyzBqo5HdUEg';
+  map = new mapboxgl.Map({
+    container: 'mapContainer',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12', // Satellite with labels
+    center: [116.4074, 39.9042], // Beijing
+    zoom: 6
+  });
+
+  // --- Utility Functions ---
+  function toLonLat(x, y) {
+    if (!metadata.radar_info) return null;
+
+    const { lon: baseLon, lat: baseLat } = metadata.radar_info.location;
+    const { x_dim, y_dim, pixel_size_km } = metadata.radar_info.properties;
+
+    // Calculate distance from the center in kilometers
+    const dx = (x - x_dim / 2) * pixel_size_km;
+    const dy = (y - y_dim / 2) * pixel_size_km;
+
+    // Earth radius in kilometers
+    const R = 6378.137;
+
+    // Calculate new latitude
+    const newLat = baseLat + (dy / R) * (180 / Math.PI);
+    // Calculate new longitude
+    const newLon = baseLon + (dx / R) * (180 / Math.PI) / Math.cos(baseLat * Math.PI / 180);
+
+    return { lon: newLon, lat: newLat };
+  }
+
+  // --- Main Data Loading & Map Setup ---
+  map.on('load', () => {
+    // Add source and layer for all annotations
+    map.addSource('annotations', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
     });
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-    // Material
-    const material = new THREE.PointsMaterial({
-      size: 2,
-      vertexColors: true,
-      transparent: true,
-      opacity: 1.0
-    });
-
-    // Points
-    const pointCloud = new THREE.Points(geometry, material);
-    scene.add(pointCloud);
-
-    // GUI
-    const gui = new lil.GUI();
-    const params = {
-      pointSize: 2,
-      opacity: 1.0,
-      color: 0xffffff,
-      startAnnotation: startAnnotation,
-      saveAnnotations: saveAnnotations,
-    };
-    gui.add(params, 'pointSize', 0.1, 10).onChange(function(value) {
-      material.size = value;
-    });
-    gui.add(params, 'opacity', 0, 1).onChange(function(value) {
-      material.opacity = value;
-    });
-    gui.addColor(params, 'color').onChange(function(value) {
-      material.color.set(value);
-      material.vertexColors = false; // Use uniform color
-    });
-    gui.add(params, 'startAnnotation').name('Start Annotation');
-    gui.add(params, 'saveAnnotations').name('Save Annotations');
-
-    // Folder for editing, hidden by default
-    const editFolder = gui.addFolder('Edit Annotation');
-    const editParams = {
-      description: '',
-      delete: deleteSelectedAnnotation
-    };
-    const descriptionController = editFolder.add(editParams, 'description').name('Description');
-    descriptionController.onChange(value => {
-      if (selectedAnnotation) {
-        selectedAnnotation.description = value;
-        selectedAnnotation.labelElement.textContent = value;
+    map.addLayer({
+      id: 'annotations-layer',
+      type: 'fill',
+      source: 'annotations',
+      paint: {
+        'fill-color': [
+          'case',
+          ['boolean', ['feature-state', 'selected'], false],
+          '#ff00ff', // Magenta when selected
+          '#00ff00'  // Green otherwise
+        ],
+        'fill-opacity': 0.5
       }
     });
-    editFolder.add(editParams, 'delete').name('Delete Selected');
-    editFolder.hide();
+    
+    Promise.all([
+      fetch('mrms_point_cloud.json').then(res => res.json()),
+      fetch('metadata/metadata.yml').then(res => res.text()).then(text => jsyaml.load(text))
+    ]).then(([points, md]) => {
+      allPoints = points;
+      metadata = md;
+      
+      const geometry = new THREE.BufferGeometry();
+      if (Array.isArray(points) && points.length > 0) {
+        const positions = [];
+        points.forEach(p => positions.push(p.x, p.y, p.z));
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      } else {
+        console.error('Point cloud JSON is empty or not an array.');
+      }
+      const material = new THREE.PointsMaterial({
+        size: params.pointSize,
+        color: new THREE.Color(params.pointColor),
+        transparent: true,
+        opacity: params.opacity,
+        vertexColors: false
+      });
+      pointCloud = new THREE.Points(geometry, material);
+      scene.add(pointCloud);
 
-    // --- Point Inspection Tool ---
-    const raycaster = new THREE.Raycaster();
-    raycaster.params.Points.threshold = 3; // Raycasting threshold for points
-    const mouse = new THREE.Vector2();
-    const tooltip = document.getElementById('tooltip');
+      // Draw main data footprint on the map, only if the data is valid
+      const { minLon, minLat, maxLon, maxLat } = calculateGeoBboxFromPoints(points);
+      if (isFinite(minLon) && isFinite(minLat) && isFinite(maxLon) && isFinite(maxLat)) {
+        map.addSource('footprint', {
+          type: 'geojson',
+          data: createGeoJsonPolygon(minLon, minLat, maxLon, maxLat)
+        });
+        map.addLayer({
+          id: 'footprint-layer',
+          type: 'line',
+          source: 'footprint',
+          paint: { 'line-color': '#ffffff', 'line-width': 2 }
+        });
+        map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 40 });
+      }
 
-    // Visual marker for the hovered point
-    const highlightGeo = new THREE.SphereGeometry(5); // Adjust size as needed
-    const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-    const highlightMarker = new THREE.Mesh(highlightGeo, highlightMat);
-    highlightMarker.visible = false;
-    scene.add(highlightMarker);
+    }).catch(error => {
+      console.error('Error loading data:', error);
+      document.body.innerHTML = '<h2>Error loading data. Check console for details.</h2>';
+    });
+  });
 
-    // --- Annotation Tool ---
-    let annotationState = 'idle'; // 'idle', 'placing_corner_1', 'placing_corner_2'
-    let corner1 = new THREE.Vector3();
-    let currentBBoxHelper = null;
-    const annotations = []; // To store final annotation objects
-    const annotationHitboxes = []; // To store invisible meshes for selection
-    const instructions = document.getElementById('instructions');
-    const labelsContainer = document.getElementById('labels-container');
-    let selectedAnnotation = null;
+  function calculateGeoBboxFromPoints(points) {
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+    points.forEach(p => {
+      const coords = toLonLat(p.x, p.y);
+      if(coords) {
+        const { lon, lat } = coords;
+        if (lon < minLon) minLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lon > maxLon) maxLon = lon;
+        if (lat > maxLat) maxLat = lat;
+      }
+    });
+    return { minLon, minLat, maxLon, maxLat };
+  }
 
-    function startAnnotation() {
-      annotationState = 'placing_corner_1';
-      controls.enabled = false; // Disable camera controls
-      instructions.style.display = 'block';
-      instructions.innerHTML = 'Click to place the first corner. Press <b>Delete</b> to remove the last annotation.';
-    }
+  function createGeoJsonPolygon(minLon, minLat, maxLon, maxLat, id, properties) {
+    const feature = {
+      type: 'Feature',
+      id: id, // ID for feature state
+      properties: properties || {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [minLon, minLat],
+            [minLon, maxLat],
+            [maxLon, maxLat],
+            [maxLon, minLat],
+            [minLon, minLat]
+          ]
+        ]
+      }
+    };
+    return feature;
+  }
 
-    function onPointerMove(event) {
-      // Update the mouse variable for raycasting
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  // --- Core Application Functions (Annotation, Selection, etc.) ---
+  function startAnnotation() {
+    annotationState = 'placing_corner_1';
+    controls.enabled = false;
+    instructions.style.display = 'block';
+    instructions.innerHTML = 'Click to place the first corner. Press <b>Delete</b> to remove the last annotation.';
+  }
 
-      // Find intersections
-      raycaster.setFromCamera(mouse, camera);
+  function onPointerMove(event) {
+    const rect = threeContainer.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+
+    if (pointCloud) {
       const intersects = raycaster.intersectObject(pointCloud);
-
       if (intersects.length > 0) {
         const intersection = intersects[0];
         const pointData = allPoints[intersection.index];
@@ -214,212 +345,220 @@ fetch('mrms_point_cloud.json')
         highlightMarker.visible = false;
       }
     }
+  }
 
-    function onPointerDown(event) {
-      // 1. FIX: Ignore clicks on the GUI panel entirely
-      if (gui.domElement.contains(event.target)) {
-        return;
-      }
+  function onPointerDown(event) {
+    // 1. FIX: Ignore clicks on the GUI panel entirely
+    if (gui.domElement.contains(event.target)) {
+      return;
+    }
 
-      raycaster.setFromCamera(mouse, camera);
+    raycaster.setFromCamera(mouse, camera);
 
-      // Handle annotation drawing first
-      if (annotationState === 'placing_corner_1' || annotationState === 'placing_corner_2') {
-        const intersects = raycaster.intersectObject(pointCloud);
-        if (intersects.length > 0) {
-            const intersectionPoint = intersects[0].point;
-
-            if (annotationState === 'placing_corner_1') {
-              corner1.copy(intersectionPoint);
-              const tempBox = new THREE.Box3().setFromPoints([corner1, corner1]);
-              currentBBoxHelper = new THREE.Box3Helper(tempBox, 0xffff00); // Yellow color
-              scene.add(currentBBoxHelper);
-              annotationState = 'placing_corner_2';
-              instructions.innerHTML = 'Click to place the second corner.';
-            } else if (annotationState === 'placing_corner_2') {
-              const corner2 = intersectionPoint;
-              const finalBox = new THREE.Box3().setFromPoints([corner1, corner2]);
-              const description = prompt("Enter a description for this annotation:", "");
-
-              if (description !== null) {
-                createAnnotation(finalBox, description);
-              }
-
-              // Clean up temporary helper
-              scene.remove(currentBBoxHelper);
-              currentBBoxHelper.geometry.dispose();
-              currentBBoxHelper.material.dispose();
-              currentBBoxHelper = null;
-              
-              // Reset state
-              annotationState = 'idle';
-              controls.enabled = true;
-              instructions.style.display = 'none';
-            }
-        }
-        return; // Exit after handling annotation drawing
-      }
-
-      // 2. SELECTION IMPROVEMENT: If not drawing, handle selection by clicking inside box
-      const intersects = raycaster.intersectObjects(annotationHitboxes);
+    // Handle annotation drawing first
+    if (annotationState === 'placing_corner_1' || annotationState === 'placing_corner_2') {
+      const intersects = raycaster.intersectObject(pointCloud);
       if (intersects.length > 0) {
-        const selectedBoxAnnotation = intersects[0].object.userData.annotation;
-        selectAnnotation(selectedBoxAnnotation);
-      } else {
-        // Clicked on empty space, deselect
-        selectAnnotation(null);
+          const intersectionPoint = intersects[0].point;
+
+          if (annotationState === 'placing_corner_1') {
+            corner1.copy(intersectionPoint);
+            const tempBox = new THREE.Box3().setFromPoints([corner1, corner1]);
+            currentBBoxHelper = new THREE.Box3Helper(tempBox, 0xffff00); // Yellow color
+            scene.add(currentBBoxHelper);
+            annotationState = 'placing_corner_2';
+            instructions.innerHTML = 'Click to place the second corner.';
+          } else if (annotationState === 'placing_corner_2') {
+            const corner2 = intersectionPoint;
+            const finalBox = new THREE.Box3().setFromPoints([corner1, corner2]);
+            const description = prompt("Enter a description for this annotation:", "");
+
+            if (description !== null) {
+              createAnnotation(finalBox, description);
+            }
+
+            // Clean up temporary helper
+            scene.remove(currentBBoxHelper);
+            currentBBoxHelper.geometry.dispose();
+            currentBBoxHelper.material.dispose();
+            currentBBoxHelper = null;
+            
+            // Reset state
+            annotationState = 'idle';
+            controls.enabled = true;
+            instructions.style.display = 'none';
+          }
+      }
+      return; // Exit after handling annotation drawing
+    }
+
+    // 2. SELECTION IMPROVEMENT: If not drawing, handle selection by clicking inside box
+    const intersects = raycaster.intersectObjects(annotationHitboxes);
+    if (intersects.length > 0) {
+      const selectedBoxAnnotation = intersects[0].object.userData.annotation;
+      selectAnnotation(selectedBoxAnnotation);
+    } else {
+      // Clicked on empty space, deselect
+      selectAnnotation(null);
+    }
+  }
+
+  function onKeyDown(event) {
+    // FIX: Ignore key events if user is interacting with the GUI
+    if (gui.domElement.contains(document.activeElement)) {
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedAnnotation) {
+      deleteSelectedAnnotation();
+    }
+  }
+
+  function createAnnotation(box, description) {
+    const newId = nextAnnotationId++;
+    const finalBoxHelper = new THREE.Box3Helper(box, 0x00ff00);
+    scene.add(finalBoxHelper);
+    const hitboxMesh = createHitbox(box);
+    const labelElement = createLabel(box, description);
+    
+    const newAnnotation = {
+      id: newId,
+      box: box,
+      description: description,
+      helper: finalBoxHelper,
+      labelElement: labelElement,
+      selectionMesh: hitboxMesh,
+      mapFeature: null,
+    };
+
+    const c1 = toLonLat(box.min.x, box.min.y);
+    const c2 = toLonLat(box.max.x, box.max.y);
+    if (c1 && c2) {
+      const minLon = Math.min(c1.lon, c2.lon);
+      const minLat = Math.min(c1.lat, c2.lat);
+      const maxLon = Math.max(c1.lon, c2.lon);
+      const maxLat = Math.max(c1.lat, c2.lat);
+      newAnnotation.mapFeature = createGeoJsonPolygon(minLon, minLat, maxLon, maxLat, newId, { description });
+    }
+
+    annotations.push(newAnnotation);
+    selectAnnotation(newAnnotation);
+    updateMapAnnotations();
+  }
+
+  function deleteSelectedAnnotation() {
+    if (!selectedAnnotation) return;
+
+    // Remove from 3D scene
+    scene.remove(selectedAnnotation.helper);
+    scene.remove(selectedAnnotation.selectionMesh);
+    labelsContainer.removeChild(selectedAnnotation.labelElement);
+    
+    // Remove from map (by removing from source data and updating)
+    if (selectedAnnotation.mapFeature) {
+      map.setFeatureState({ source: 'annotations', id: selectedAnnotation.id }, { selected: false });
+    }
+
+    // Remove from our master list
+    const index = annotations.findIndex(a => a.id === selectedAnnotation.id);
+    if (index > -1) {
+      annotations.splice(index, 1);
+    }
+    
+    selectAnnotation(null); // Deselect
+    updateMapAnnotations(); // Re-render map annotations
+  }
+
+  function selectAnnotation(annotation) {
+    // Deselect previous
+    if (selectedAnnotation) {
+      selectedAnnotation.helper.material.color.set(0x00ff00); // Back to green
+      if (selectedAnnotation.mapFeature) {
+        map.setFeatureState({ source: 'annotations', id: selectedAnnotation.id }, { selected: false });
       }
     }
 
-    function onKeyDown(event) {
-      // FIX: Ignore key events if user is interacting with the GUI
-      if (gui.domElement.contains(document.activeElement)) {
-        return;
-      }
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedAnnotation) {
-        deleteSelectedAnnotation();
-      }
-    }
+    selectedAnnotation = annotation;
 
-    function createAnnotation(box, description) {
-        const finalBoxHelper = new THREE.Box3Helper(box, 0x00ff00);
-        scene.add(finalBoxHelper);
-
-        const labelElement = document.createElement('div');
-        labelElement.className = 'annotation-label';
-        labelElement.textContent = description;
-        labelsContainer.appendChild(labelElement);
-
-        // Create invisible hitbox for selection
-        const boxSize = new THREE.Vector3();
-        box.getSize(boxSize);
-        const boxCenter = new THREE.Vector3();
-        box.getCenter(boxCenter);
-        const hitboxGeo = new THREE.BoxGeometry(boxSize.x, boxSize.y, boxSize.z);
-        const hitboxMat = new THREE.MeshBasicMaterial({ visible: false, depthWrite: false });
-        const hitboxMesh = new THREE.Mesh(hitboxGeo, hitboxMat);
-        hitboxMesh.position.copy(boxCenter);
-        scene.add(hitboxMesh);
-        annotationHitboxes.push(hitboxMesh);
-        
-        const newAnnotation = {
-          box: box,
-          description: description,
-          helper: finalBoxHelper,
-          labelElement: labelElement,
-          selectionMesh: hitboxMesh,
-        };
-        annotations.push(newAnnotation);
-        hitboxMesh.userData.annotation = newAnnotation; // Link mesh back to its data
-        selectAnnotation(newAnnotation);
-    }
-
-    function selectAnnotation(annotation) {
-      // Deselect previous
-      if (selectedAnnotation) {
-        selectedAnnotation.helper.material.color.set(0x00ff00); // Back to green
-      }
-
-      selectedAnnotation = annotation;
-
-      if (selectedAnnotation) {
-        // Select new
-        selectedAnnotation.helper.material.color.set(0xff00ff); // Magenta for selected
-        editParams.description = selectedAnnotation.description;
-        descriptionController.updateDisplay();
-        editFolder.show();
-      } else {
-        // Deselected all
-        editFolder.hide();
-      }
-    }
-
-    function deleteSelectedAnnotation() {
-      if (!selectedAnnotation) return;
-
-      const index = annotations.indexOf(selectedAnnotation);
-      if (index > -1) {
-        annotations.splice(index, 1);
-      }
-
-      // Remove hitbox from scene and array
-      scene.remove(selectedAnnotation.selectionMesh);
-      const hitboxIndex = annotationHitboxes.indexOf(selectedAnnotation.selectionMesh);
-      if (hitboxIndex > -1) {
-          annotationHitboxes.splice(hitboxIndex, 1);
-      }
-      selectedAnnotation.selectionMesh.geometry.dispose();
-      selectedAnnotation.selectionMesh.material.dispose();
-
-      // Remove visual helper
-      scene.remove(selectedAnnotation.helper);
-      selectedAnnotation.helper.geometry.dispose();
-      selectedAnnotation.helper.material.dispose();
-      
-      // Remove the label from the DOM
-      labelsContainer.removeChild(selectedAnnotation.labelElement);
-      
-      selectAnnotation(null); // Deselect
-    }
-
-    // 3. SAVE FEATURE
-    function saveAnnotations() {
-        if (annotations.length === 0) {
-            alert("There are no annotations on the screen to save.");
-            return;
+    // Select new one
+    if (selectedAnnotation) {
+      selectedAnnotation.helper.material.color.set(0xff00ff); // Magenta
+      editFolder.children.forEach(c => c.destroy());
+      const descriptionController = editFolder.add(selectedAnnotation, 'description').name('Description');
+      descriptionController.onChange(val => {
+        selectedAnnotation.labelElement.textContent = val;
+        if(selectedAnnotation.mapFeature) {
+          selectedAnnotation.mapFeature.properties.description = val;
+          updateMapAnnotations();
         }
-
-        const serializableAnnotations = annotations.map(anno => ({
-            description: anno.description,
-            box_min: anno.box.min,
-            box_max: anno.box.max,
-        }));
-
-        const jsonString = JSON.stringify(serializableAnnotations, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-
-        // Create a timestamped filename
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-'); // YYYY-MM-DDTHH-mm-ss-SSSZ
-        a.download = `annotations_${timestamp}.json`;
-
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-
-    // Render loop
-    const tempVec = new THREE.Vector3();
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-
-      // Update annotation label positions
-      annotations.forEach(anno => {
-        anno.box.getCenter(tempVec);
-        tempVec.project(camera);
-        const x = (tempVec.x *  .5 + .5) * renderer.domElement.clientWidth;
-        const y = (tempVec.y * -.5 + .5) * renderer.domElement.clientHeight;
-        anno.labelElement.style.transform = `translate(-50%, -120%) translate(${x}px, ${y}px)`;
       });
-
-      renderer.render(scene, camera);
+      editFolder.show();
+      if (selectedAnnotation.mapFeature) {
+        map.setFeatureState({ source: 'annotations', id: selectedAnnotation.id }, { selected: true });
+      }
+    } else {
+      editFolder.hide();
     }
-    animate();
-  })
-  .catch(error => {
-    console.error('Error loading or rendering point cloud:', error);
-    document.body.innerHTML = '<h2>Error loading or rendering point cloud:<br>' + error + '</h2>';
-  });
+  }
+
+  function saveAnnotations() {
+    if (annotations.length === 0) {
+      alert("There are no annotations on the screen to save.");
+      return;
+    }
+
+    const serializableAnnotations = annotations.map(anno => ({
+      description: anno.description,
+      box_min: anno.box.min,
+      box_max: anno.box.max,
+    }));
+
+    const jsonString = JSON.stringify(serializableAnnotations, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+
+    // Create a timestamped filename
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-'); // YYYY-MM-DDTHH-mm-ss-SSSZ
+    a.download = `annotations_${timestamp}.json`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function updateMapAnnotations() {
+    const source = map.getSource('annotations');
+    if (source) {
+      const features = annotations.map(a => a.mapFeature).filter(f => f);
+      source.setData({ type: 'FeatureCollection', features: features });
+    }
+  }
+
+  // --- Event Listeners & Render Loop ---
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('keydown', onKeyDown);
+  
+  const tempVec = new THREE.Vector3();
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+
+    annotations.forEach(anno => {
+      anno.box.getCenter(tempVec);
+      tempVec.project(camera);
+      const x = (tempVec.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+      const y = (tempVec.y * -0.5 + 0.5) * renderer.domElement.clientHeight;
+      anno.labelElement.style.transform = `translate(-50%, -120%) translate(${x}px, ${y}px)`;
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
 </script>
 </body>
 </html> 
