@@ -14,6 +14,14 @@ def test_pytorch_loader(model, test_input_handle, configs, itr):
 
     for batch_id, test_ims in enumerate(test_input_handle):
 
+        # Support for annotation mask
+        has_ann_mask = False
+        if isinstance(test_ims, dict) and 'annotation_mask' in test_ims:
+            ann_mask = test_ims['annotation_mask'].numpy()
+            has_ann_mask = True
+        else:
+            ann_mask = None
+
         test_ims = test_ims['radar_frames'].numpy()
         img_gen = model.test(test_ims)
         output_length = configs.total_length - configs.input_length
@@ -57,5 +65,31 @@ def test_pytorch_loader(model, test_input_handle, configs, itr):
             save_plots(img_gen_plot,
                        labels=['pd{}'.format(i + 1) for i in range(9, configs.total_length)],
                        res_path=path, vmin=vis_info['vmin'], vmax=vis_info['vmax'])
+
+            # --- Visualization: ground truth, prediction, annotation mask ---
+            if has_ann_mask:
+                gt_img = test_ims_plot[0][..., 0]  # First channel only
+                pred_img = img_gen_plot[0][..., 0]  # First channel only
+                # Ensure annotation mask is 2D
+                if ann_mask.ndim == 3:
+                    ann_mask = ann_mask[..., 0]
+                ann_img = ann_mask
+                if ann_img.shape != gt_img.shape:
+                    ann_img = cv2.resize(ann_img, (gt_img.shape[1], gt_img.shape[0]))
+                fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+                axs[0].imshow(gt_img, cmap='viridis')
+                axs[0].set_title('Ground Truth')
+                axs[1].imshow(pred_img, cmap='viridis')
+                axs[1].set_title('Prediction')
+                axs[2].imshow(ann_img, cmap='gray')
+                axs[2].set_title('Annotation Mask')
+                for ax in axs:
+                    ax.axis('off')
+                plt.tight_layout()
+                # Save PNG
+                plt.savefig(os.path.join(path, 'compare_gt_pred_ann.png'))
+                # Show interactively
+                plt.show()
+                plt.close()
 
     print('finished!')

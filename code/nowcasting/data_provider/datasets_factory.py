@@ -18,7 +18,9 @@ def data_provider(configs):
                             'total_length': configs.total_length,
                             'data_path': configs.dataset_path,
                             'type': 'test',
-                            }
+                        }
+        if hasattr(configs, 'annotation_mask_path') and configs.annotation_mask_path is not None:
+            test_input_param['annotation_mask_path'] = configs.annotation_mask_path
         test_input_handle = datasets_map[configs.dataset_name].InputHandle(test_input_param)
         test_input_handle = DataLoader(test_input_handle,
                                        batch_size=configs.batch_size,

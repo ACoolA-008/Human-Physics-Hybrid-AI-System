@@ -16,6 +16,7 @@ class InputHandle(Dataset):
         self.length = input_param['total_length']
         self.data_path = input_param['data_path']
         self.type = input_param['type'] #train/test/valid
+        self.annotation_mask_path = input_param.get('annotation_mask_path', None)
 
         self.case_list = []
         name_list = os.listdir(self.data_path)
@@ -25,6 +26,16 @@ class InputHandle(Dataset):
             for i in range(29):
                 case.append(self.data_path + '/' + name + '/' + name + '-' + str(i).zfill(2) + '.png')
             self.case_list.append(case)
+
+        # If annotation masks are provided, build mask paths
+        if self.annotation_mask_path is not None:
+            self.mask_list = []
+            for name in name_list:
+                # Assumes one mask per case, named as 'mask.png' in each folder
+                mask_path = os.path.join(self.annotation_mask_path, name, 'mask.png')
+                self.mask_list.append(mask_path)
+        else:
+            self.mask_list = None
 
     def load(self, index):
         data = []
@@ -47,6 +58,15 @@ class InputHandle(Dataset):
         vid[..., 1] = mask
         img = dict()
         img['radar_frames'] = vid
+        # Load annotation mask if available
+        if self.mask_list is not None:
+            mask_path = self.mask_list[index]
+            if os.path.exists(mask_path):
+                ann_mask = cv2.imread(mask_path, 0)  # Load as grayscale
+                ann_mask = cv2.resize(ann_mask, (self.img_width, self.img_height))
+                img['annotation_mask'] = ann_mask
+            else:
+                img['annotation_mask'] = np.zeros((self.img_height, self.img_width), dtype=np.uint8)
         return img
 
     def __len__(self):
