@@ -14,15 +14,33 @@
     }
     #main-container {
       display: flex;
-      width: 100%;
-      height: 100%;
-    }
-    #threeContainer, #mapContainer {
-      width: 50%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
     }
     #threeContainer {
-      position: relative; /* Needed for positioning children */
+      flex: 1 1 auto;
+      min-width: 300px;
+      height: 100vh;
+      position: relative;
+    }
+    #resizer {
+      width: 6px;
+      background: #4fc3f7;
+      cursor: ew-resize;
+      z-index: 100;
+      height: 100vh;
+    }
+    #tool-panel {
+      width: 400px;
+      min-width: 260px;
+      max-width: 700px;
+      height: 100vh;
+      background: rgba(30,30,30,0.98);
+      border-left: 2px solid #4fc3f7;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 0.2s;
     }
     #tooltip {
       position: absolute;
@@ -59,6 +77,242 @@
       transform: translate(-50%, -120%); /* Position above the center point */
       z-index: 10;
     }
+    /* --- Added for better GUI visibility --- */
+    .lil-gui.root {
+      position: fixed !important;
+      top: 20px !important;
+      right: 20px !important;
+      left: auto !important;
+      z-index: 99999 !important;
+      background: rgba(30, 30, 30, 0.98) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7) !important;
+      min-width: 320px !important;
+      font-size: 18px !important;
+      padding: 16px !important;
+      border: 2px solid #4fc3f7 !important;
+      display: block !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transition: opacity 0.2s;
+    }
+    .lil-gui.root.collapsed {
+      opacity: 0.3 !important;
+      pointer-events: auto !important;
+      width: 40px !important;
+      min-width: 40px !important;
+      max-width: 40px !important;
+      overflow: hidden !important;
+      padding: 8px !important;
+    }
+    .lil-gui.root .title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin-bottom: 10px;
+    }
+    .lil-gui.root .instructions {
+      font-size: 15px;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+    .lil-gui.root .button, .lil-gui.root .slider {
+      font-size: 18px !important;
+      margin: 8px 0 !important;
+    }
+    /* Test panel for visibility */
+    #test-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100000;
+      background: #222;
+      color: #fff;
+      padding: 20px;
+      font-size: 20px;
+      border-radius: 8px;
+      display: none;
+    }
+    #annotation-toolbar {
+      flex-shrink: 0;
+      width: 100%;
+      background: rgba(30,30,30,0.98);
+      border-radius: 0;
+      box-shadow: none;
+      font-size: 15px;
+      padding: 10px 14px 14px 14px;
+      border: none;
+      border-top: 2px solid #4fc3f7;
+      color: #fff;
+    }
+    #annotation-toolbar.collapsed {
+      opacity: 1;
+      pointer-events: auto;
+      width: 100%;
+      min-width: auto;
+      max-width: none;
+      overflow: hidden;
+      padding: 8px;
+    }
+    #collapse-btn {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 100000;
+      background: #4fc3f7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .toolbar-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin-bottom: 6px;
+    }
+    .toolbar-instructions {
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    #annotation-toolbar button:not(#collapse-btn) {
+      font-size: 15px;
+      margin: 6px 0 6px 0;
+      padding: 6px 12px;
+      border-radius: 5px;
+      border: none;
+      background: #4fc3f7;
+      color: #fff;
+      cursor: pointer;
+      width: 100%;
+    }
+    #annotation-toolbar label {
+      display: block;
+      margin: 6px 0 2px 0;
+      font-size: 13px;
+    }
+    #annotation-toolbar input[type="range"] {
+      width: 100%;
+    }
+    #annotation-toolbar input[type="color"] {
+      width: 32px;
+      height: 24px;
+      border: none;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    /* Enhanced annotation management panel */
+    #annotation-manager {
+      flex: 1 1 0;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    #annotation-manager.collapsed {
+      width: 100%;
+      min-width: auto;
+      max-width: none;
+      overflow: hidden;
+      padding: 8px;
+    }
+    .manager-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .manager-collapse-btn {
+      background: #4fc3f7;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .search-box {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #4fc3f7;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .annotation-list {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .annotation-item {
+      padding: 8px;
+      margin: 4px 0;
+      background: rgba(79,195,247,0.1);
+      border: 1px solid rgba(79,195,247,0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .annotation-item:hover {
+      background: rgba(79,195,247,0.2);
+    }
+    .annotation-item.selected {
+      background: rgba(79,195,247,0.4);
+      border-color: #4fc3f7;
+    }
+    .annotation-item .description {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .annotation-item .coords {
+      font-size: 11px;
+      color: #ccc;
+    }
+    .bulk-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .bulk-actions button {
+      flex: 1;
+      padding: 6px 8px;
+      border: none;
+      border-radius: 4px;
+      background: #4fc3f7;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .bulk-actions button:hover {
+      background: #29b6f6;
+    }
+    .bulk-actions button.danger {
+      background: #f44336;
+    }
+    .bulk-actions button.danger:hover {
+      background: #d32f2f;
+    }
+    .stats {
+      font-size: 12px;
+      color: #ccc;
+      margin-bottom: 10px;
+    }
+    #mapContainer {
+      width: 320px;
+      min-width: 200px;
+      max-width: 600px;
+      height: 100vh;
+      position: relative;
+      flex-shrink: 0;
+      flex-grow: 0;
+      background: #222;
+    }
   </style>
 </head>
 <body>
@@ -68,8 +322,47 @@
     <div id="instructions"></div>
     <div id="labels-container"></div>
   </div>
+  <div id="resizer"></div>
+  <div id="tool-panel">
+    <!-- Annotation Manager Panel -->
+    <div id="annotation-manager">
+      <div class="manager-title">
+        Annotation List
+        <button class="manager-collapse-btn" onclick="toggleManager()">⮜</button>
+      </div>
+      <div class="stats" id="annotation-stats">Total: 0 annotations</div>
+      <input type="text" class="search-box" id="search-box" placeholder="Search annotations..." oninput="filterAnnotations()">
+      <div class="bulk-actions">
+        <button onclick="selectAllAnnotations()">Select All</button>
+        <button onclick="deselectAllAnnotations()">Deselect All</button>
+        <button class="danger" onclick="deleteSelectedAnnotations()">Delete Selected</button>
+      </div>
+      <div class="annotation-list" id="annotation-list">
+        <!-- Annotation items will be populated here -->
+      </div>
+      <div class="bulk-actions">
+        <button onclick="exportAnnotations()">Export JSON</button>
+        <button onclick="importAnnotations()">Import JSON</button>
+        <button onclick="clearAllAnnotations()" class="danger">Clear All</button>
+      </div>
+    </div>
+    
+    <!-- Annotation Toolbar -->
+    <div id="annotation-toolbar">
+      <button id="collapse-btn">⮜</button>
+      <div class="toolbar-title">Annotation Controls</div>
+      <div class="toolbar-instructions">Click and drag to draw bounding boxes directly.</div>
+      <button onclick="saveAnnotations()">Save Annotations</button>
+      <label>Point Size: <input type="range" min="1" max="10" value="2" id="pointSizeSlider"></label>
+      <label>Opacity: <input type="range" min="0" max="1" step="0.01" value="1" id="opacitySlider"></label>
+      <label>Color: <input type="color" id="colorPicker" value="#ffffff"></label>
+    </div>
+  </div>
+  
   <div id="mapContainer"></div>
 </div>
+
+<div id="test-panel">Test Panel: If you see this, the top left is visible.</div>
 
 <script src='https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js'></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
@@ -85,7 +378,17 @@
   let controls; // <-- Make controls globally accessible
   let pointCloud;
   let gridHelper;
+  let material; // <-- Add material variable for point cloud
   
+  // --- Annotation Parameters (must be global!) ---
+  const params = {
+    pointSize: 2,
+    opacity: 1.0,
+    pointColor: 0xffffff, // Used for THREE.PointsMaterial
+    color: 0xffffff,      // For lil-gui compatibility
+    saveAnnotations: saveAnnotations,
+  };
+
   // --- Core Scene Setup ---
   const threeContainer = document.getElementById('threeContainer');
   const scene = new THREE.Scene();
@@ -99,40 +402,6 @@
 
   gridHelper = new THREE.GridHelper(1000, 20);
   scene.add(gridHelper);
-
-  // --- GUI Setup ---
-  const gui = new lil.GUI({ container: threeContainer });
-  const params = {
-    pointSize: 2,
-    opacity: 1.0,
-    color: 0xffffff,
-    startAnnotation: startAnnotation,
-    saveAnnotations: saveAnnotations,
-  };
-  gui.add(params, 'pointSize', 0.1, 10).onChange(value => {
-    material.size = value;
-  });
-  gui.add(params, 'opacity', 0, 1).onChange(value => {
-    material.opacity = value;
-  });
-  gui.addColor(params, 'color').onChange(value => {
-    material.color.set(value);
-    material.vertexColors = false;
-  });
-  gui.add(params, 'startAnnotation').name('Start Annotation');
-  gui.add(params, 'saveAnnotations').name('Save Annotations');
-
-  const editFolder = gui.addFolder('Edit Annotation');
-  const editParams = { description: '', delete: deleteSelectedAnnotation };
-  const descriptionController = editFolder.add(editParams, 'description').name('Description');
-  descriptionController.onChange(value => {
-    if (selectedAnnotation) {
-      selectedAnnotation.description = value;
-      selectedAnnotation.labelElement.textContent = value;
-    }
-  });
-  editFolder.add(editParams, 'delete').name('Delete Selected');
-  editFolder.hide();
 
   // --- Point Inspection & Annotation Setup ---
   const raycaster = new THREE.Raycaster();
@@ -150,9 +419,12 @@
   let currentBBoxHelper = null;
   const annotations = [];
   const annotationHitboxes = [];
-  const instructions = document.getElementById('instructions');
   const labelsContainer = document.getElementById('labels-container');
   let selectedAnnotation = null;
+  let selectedAnnotations = new Set(); // For bulk selection
+  let filteredAnnotations = []; // For search functionality
+  let isDrawing = false; // Track if we're currently drawing
+  let dragStartPoint = new THREE.Vector3();
 
   // --- NEW: Mapbox Viewer Initialization ---
   mapboxgl.accessToken = 'pk.eyJ1IjoiYWNvb2xhMDA4IiwiYSI6ImNtYzVzaWg3NjBza2sybnB0M3BlaGk3N28ifQ.MQcLcmFS08WyzBqo5HdUEg';
@@ -222,7 +494,7 @@
       } else {
         console.error('Point cloud JSON is empty or not an array.');
       }
-      const material = new THREE.PointsMaterial({
+      material = new THREE.PointsMaterial({
         size: params.pointSize,
         color: new THREE.Color(params.pointColor),
         transparent: true,
@@ -231,6 +503,7 @@
       });
       pointCloud = new THREE.Points(geometry, material);
       scene.add(pointCloud);
+      setupPointCloudControls();
 
       // Draw main data footprint on the map, only if the data is valid
       const { minLon, minLat, maxLon, maxLat } = calculateGeoBboxFromPoints(points);
@@ -291,13 +564,6 @@
   }
 
   // --- Core Application Functions (Annotation, Selection, etc.) ---
-  function startAnnotation() {
-    annotationState = 'placing_corner_1';
-    controls.enabled = false;
-    instructions.style.display = 'block';
-    instructions.innerHTML = 'Click to place the first corner. Press <b>Delete</b> to remove the last annotation.';
-  }
-
   function onPointerMove(event) {
     const rect = threeContainer.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -313,7 +579,11 @@
         highlightMarker.position.copy(intersection.point);
         highlightMarker.visible = true;
 
-        if (annotationState === 'idle') {
+        if (isDrawing) {
+          // Update the bounding box helper in real-time while dragging
+          const currentPoint = intersection.point;
+          currentBBoxHelper.box.setFromPoints([dragStartPoint, currentPoint]);
+        } else {
           // Update tooltip when not annotating
           tooltip.style.display = 'block';
           tooltip.style.left = event.clientX + 10 + 'px';
@@ -334,11 +604,6 @@
             }
           });
           tooltip.innerHTML = tooltipContent;
-
-        } else if (annotationState === 'placing_corner_2') {
-           // Update the bounding box helper in real-time
-           const corner2 = intersection.point;
-           currentBBoxHelper.box.setFromPoints([corner1, corner2]);
         }
       } else {
         tooltip.style.display = 'none';
@@ -348,69 +613,85 @@
   }
 
   function onPointerDown(event) {
-    // 1. FIX: Ignore clicks on the GUI panel entirely
-    if (gui.domElement.contains(event.target)) {
+    // Ignore clicks on tool panel or resizer
+    if (document.getElementById('tool-panel').contains(event.target) || document.getElementById('resizer').contains(event.target)) {
       return;
     }
-
     raycaster.setFromCamera(mouse, camera);
-
-    // Handle annotation drawing first
-    if (annotationState === 'placing_corner_1' || annotationState === 'placing_corner_2') {
-      const intersects = raycaster.intersectObject(pointCloud);
-      if (intersects.length > 0) {
-          const intersectionPoint = intersects[0].point;
-
-          if (annotationState === 'placing_corner_1') {
-            corner1.copy(intersectionPoint);
-            const tempBox = new THREE.Box3().setFromPoints([corner1, corner1]);
-            currentBBoxHelper = new THREE.Box3Helper(tempBox, 0xffff00); // Yellow color
-            scene.add(currentBBoxHelper);
-            annotationState = 'placing_corner_2';
-            instructions.innerHTML = 'Click to place the second corner.';
-          } else if (annotationState === 'placing_corner_2') {
-            const corner2 = intersectionPoint;
-            const finalBox = new THREE.Box3().setFromPoints([corner1, corner2]);
-            const description = prompt("Enter a description for this annotation:", "");
-
-            if (description !== null) {
-              createAnnotation(finalBox, description);
-            }
-
-            // Clean up temporary helper
-            scene.remove(currentBBoxHelper);
-            currentBBoxHelper.geometry.dispose();
-            currentBBoxHelper.material.dispose();
-            currentBBoxHelper = null;
-            
-            // Reset state
-            annotationState = 'idle';
-            controls.enabled = true;
-            instructions.style.display = 'none';
-          }
-      }
-      return; // Exit after handling annotation drawing
-    }
-
-    // 2. SELECTION IMPROVEMENT: If not drawing, handle selection by clicking inside box
-    const intersects = raycaster.intersectObjects(annotationHitboxes);
+    const intersects = raycaster.intersectObject(pointCloud);
     if (intersects.length > 0) {
-      const selectedBoxAnnotation = intersects[0].object.userData.annotation;
-      selectAnnotation(selectedBoxAnnotation);
-    } else {
-      // Clicked on empty space, deselect
-      selectAnnotation(null);
+      const intersectionPoint = intersects[0].point;
+      if (event.button === 0) { // Left click
+        isDrawing = true;
+        dragStartPoint.copy(intersectionPoint);
+        const tempBox = new THREE.Box3().setFromPoints([dragStartPoint, dragStartPoint]);
+        currentBBoxHelper = new THREE.Box3Helper(tempBox, 0xffff00); // Yellow color
+        scene.add(currentBBoxHelper);
+        controls.enabled = false;
+        instructions.style.display = 'block';
+        instructions.innerHTML = 'Drag to complete the bounding box. Release to finish.';
+      }
+    }
+  }
+
+  function onPointerUp(event) {
+    if (isDrawing && currentBBoxHelper) {
+      const rect = threeContainer.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(pointCloud);
+      
+      if (intersects.length > 0) {
+        const endPoint = intersects[0].point;
+        const finalBox = new THREE.Box3().setFromPoints([dragStartPoint, endPoint]);
+        
+        // Only create annotation if the box has some size
+        const size = finalBox.getSize(new THREE.Vector3());
+        if (size.length() > 1) { // Minimum size threshold
+          const description = prompt("Enter a description for this annotation:", "");
+          if (description !== null && description.trim() !== '') {
+            createAnnotation(finalBox, description);
+          }
+        }
+      }
+      
+      // Clean up drawing state
+      scene.remove(currentBBoxHelper);
+      currentBBoxHelper.geometry.dispose();
+      currentBBoxHelper.material.dispose();
+      currentBBoxHelper = null;
+      isDrawing = false;
+      controls.enabled = true;
+      instructions.style.display = 'none';
     }
   }
 
   function onKeyDown(event) {
-    // FIX: Ignore key events if user is interacting with the GUI
-    if (gui.domElement.contains(document.activeElement)) {
+    // Ignore key events if user is interacting with the right panel
+    if (document.getElementById('tool-panel').contains(document.activeElement)) {
       return;
     }
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedAnnotation) {
       deleteSelectedAnnotation();
     }
+    // Cancel annotation drawing with Escape key
+    if (event.key === 'Escape' && isDrawing) {
+      cancelAnnotation();
+    }
+  }
+
+  function cancelAnnotation() {
+    if (currentBBoxHelper) {
+      scene.remove(currentBBoxHelper);
+      currentBBoxHelper.geometry.dispose();
+      currentBBoxHelper.material.dispose();
+      currentBBoxHelper = null;
+    }
+    isDrawing = false;
+    controls.enabled = true;
+    instructions.style.display = 'none';
   }
 
   function createAnnotation(box, description) {
@@ -443,6 +724,36 @@
     annotations.push(newAnnotation);
     selectAnnotation(newAnnotation);
     updateMapAnnotations();
+    updateAnnotationManager();
+  }
+
+  // Helper function to create invisible hitbox for selection
+  function createHitbox(box) {
+    const geometry = new THREE.BoxGeometry(
+      box.max.x - box.min.x,
+      box.max.y - box.min.y,
+      box.max.z - box.min.z
+    );
+    const material = new THREE.MeshBasicMaterial({ 
+      transparent: true, 
+      opacity: 0.0,
+      color: 0xffffff 
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(box.getCenter(new THREE.Vector3()));
+    mesh.userData.annotation = { box: box }; // Reference to the annotation
+    annotationHitboxes.push(mesh);
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Helper function to create label element
+  function createLabel(box, description) {
+    const labelElement = document.createElement('div');
+    labelElement.className = 'annotation-label';
+    labelElement.textContent = description;
+    labelsContainer.appendChild(labelElement);
+    return labelElement;
   }
 
   function deleteSelectedAnnotation() {
@@ -466,6 +777,7 @@
     
     selectAnnotation(null); // Deselect
     updateMapAnnotations(); // Re-render map annotations
+    updateAnnotationManager(); // Update the manager
   }
 
   function selectAnnotation(annotation) {
@@ -482,21 +794,7 @@
     // Select new one
     if (selectedAnnotation) {
       selectedAnnotation.helper.material.color.set(0xff00ff); // Magenta
-      editFolder.children.forEach(c => c.destroy());
-      const descriptionController = editFolder.add(selectedAnnotation, 'description').name('Description');
-      descriptionController.onChange(val => {
-        selectedAnnotation.labelElement.textContent = val;
-        if(selectedAnnotation.mapFeature) {
-          selectedAnnotation.mapFeature.properties.description = val;
-          updateMapAnnotations();
-        }
-      });
-      editFolder.show();
-      if (selectedAnnotation.mapFeature) {
-        map.setFeatureState({ source: 'annotations', id: selectedAnnotation.id }, { selected: true });
-      }
-    } else {
-      editFolder.hide();
+      // Editing is now handled in the right panel only
     }
   }
 
@@ -538,9 +836,284 @@
     }
   }
 
+  // --- Enhanced Annotation Management Functions ---
+  
+  function updateAnnotationManager() {
+    updateAnnotationStats();
+    updateAnnotationList();
+    updateFilteredAnnotations();
+  }
+
+  function updateAnnotationStats() {
+    const statsElement = document.getElementById('annotation-stats');
+    const total = annotations.length;
+    const selected = selectedAnnotations.size;
+    statsElement.textContent = `Total: ${total} annotations${selected > 0 ? ` | Selected: ${selected}` : ''}`;
+  }
+
+  function updateAnnotationList() {
+    const listElement = document.getElementById('annotation-list');
+    const annotationsToShow = filteredAnnotations.length > 0 ? filteredAnnotations : annotations;
+    
+    listElement.innerHTML = '';
+    
+    annotationsToShow.forEach((annotation, index) => {
+      const item = document.createElement('div');
+      item.className = 'annotation-item';
+      if (selectedAnnotations.has(annotation.id)) {
+        item.classList.add('selected');
+      }
+      
+      const center = annotation.box.getCenter(new THREE.Vector3());
+      item.innerHTML = `
+        <div class="description">${annotation.description}</div>
+        <div class="coords">Center: (${center.x.toFixed(1)}, ${center.y.toFixed(1)}, ${center.z.toFixed(1)})</div>
+      `;
+      
+      item.onclick = (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          // Multi-select with Ctrl/Cmd
+          toggleAnnotationSelection(annotation.id);
+        } else {
+          // Single select
+          selectAnnotation(annotation);
+          selectedAnnotations.clear();
+          selectedAnnotations.add(annotation.id);
+        }
+        updateAnnotationManager();
+      };
+      
+      listElement.appendChild(item);
+    });
+  }
+
+  function updateFilteredAnnotations() {
+    const searchTerm = document.getElementById('search-box').value.toLowerCase();
+    if (searchTerm === '') {
+      filteredAnnotations = [];
+    } else {
+      filteredAnnotations = annotations.filter(annotation => 
+        annotation.description.toLowerCase().includes(searchTerm)
+      );
+    }
+    updateAnnotationList();
+  }
+
+  function filterAnnotations() {
+    updateFilteredAnnotations();
+  }
+
+  function toggleAnnotationSelection(annotationId) {
+    if (selectedAnnotations.has(annotationId)) {
+      selectedAnnotations.delete(annotationId);
+    } else {
+      selectedAnnotations.add(annotationId);
+    }
+    updateAnnotationManager();
+  }
+
+  function selectAllAnnotations() {
+    const annotationsToSelect = filteredAnnotations.length > 0 ? filteredAnnotations : annotations;
+    annotationsToSelect.forEach(annotation => {
+      selectedAnnotations.add(annotation.id);
+    });
+    updateAnnotationManager();
+  }
+
+  function deselectAllAnnotations() {
+    selectedAnnotations.clear();
+    updateAnnotationManager();
+  }
+
+  function deleteSelectedAnnotations() {
+    if (selectedAnnotations.size === 0) {
+      alert('No annotations selected for deletion.');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${selectedAnnotations.size} annotation(s)?`)) {
+      return;
+    }
+    
+    const annotationsToDelete = Array.from(selectedAnnotations);
+    annotationsToDelete.forEach(id => {
+      const annotation = annotations.find(a => a.id === id);
+      if (annotation) {
+        deleteAnnotation(annotation);
+      }
+    });
+    
+    selectedAnnotations.clear();
+    updateAnnotationManager();
+  }
+
+  function deleteAnnotation(annotation) {
+    // Remove from 3D scene
+    scene.remove(annotation.helper);
+    scene.remove(annotation.selectionMesh);
+    if (annotation.labelElement && annotation.labelElement.parentNode) {
+      annotation.labelElement.parentNode.removeChild(annotation.labelElement);
+    }
+    
+    // Remove from map
+    if (annotation.mapFeature) {
+      map.setFeatureState({ source: 'annotations', id: annotation.id }, { selected: false });
+    }
+
+    // Remove from arrays
+    const index = annotations.findIndex(a => a.id === annotation.id);
+    if (index > -1) {
+      annotations.splice(index, 1);
+    }
+    
+    const hitboxIndex = annotationHitboxes.findIndex(h => h.userData.annotation && h.userData.annotation.box === annotation.box);
+    if (hitboxIndex > -1) {
+      annotationHitboxes.splice(hitboxIndex, 1);
+    }
+    
+    // If this was the selected annotation, deselect it
+    if (selectedAnnotation === annotation) {
+      selectAnnotation(null);
+    }
+    
+    updateMapAnnotations();
+  }
+
+  function clearAllAnnotations() {
+    if (annotations.length === 0) {
+      alert('No annotations to clear.');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete all ${annotations.length} annotations?`)) {
+      return;
+    }
+    
+    // Clear all annotations
+    annotations.forEach(annotation => {
+      scene.remove(annotation.helper);
+      scene.remove(annotation.selectionMesh);
+      if (annotation.labelElement && annotation.labelElement.parentNode) {
+        annotation.labelElement.parentNode.removeChild(annotation.labelElement);
+      }
+    });
+    
+    annotations.length = 0;
+    annotationHitboxes.length = 0;
+    selectedAnnotation = null;
+    selectedAnnotations.clear();
+    
+    updateMapAnnotations();
+    updateAnnotationManager();
+  }
+
+  function exportAnnotations() {
+    if (annotations.length === 0) {
+      alert('No annotations to export.');
+      return;
+    }
+    
+    const serializableAnnotations = annotations.map(anno => ({
+      id: anno.id,
+      description: anno.description,
+      box_min: { x: anno.box.min.x, y: anno.box.min.y, z: anno.box.min.z },
+      box_max: { x: anno.box.max.x, y: anno.box.max.y, z: anno.box.max.z },
+      created_at: new Date().toISOString()
+    }));
+
+    const jsonString = JSON.stringify(serializableAnnotations, null, 2);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `annotations_${timestamp}.json`;
+    
+    // Try to save to server first, fallback to download
+    fetch('/save_annotations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        filename: filename,
+        data: serializableAnnotations
+      })
+    })
+    .then(response => {
+      if (response.ok) {
+        return response.json();
+      } else {
+        throw new Error('Server save failed');
+      }
+    })
+    .then(result => {
+      alert(`Annotations saved to server: ${result.filepath}`);
+    })
+    .catch(error => {
+      console.log('Server save failed, falling back to download:', error);
+      // Fallback to download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('Annotations downloaded (server save unavailable)');
+    });
+  }
+
+  function importAnnotations() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedAnnotations = JSON.parse(e.target.result);
+          
+          if (!Array.isArray(importedAnnotations)) {
+            throw new Error('Invalid annotation file format');
+          }
+          
+          // Clear existing annotations
+          clearAllAnnotations();
+          
+          // Import new annotations
+          importedAnnotations.forEach(imported => {
+            const box = new THREE.Box3(
+              new THREE.Vector3(imported.box_min.x, imported.box_min.y, imported.box_min.z),
+              new THREE.Vector3(imported.box_max.x, imported.box_max.y, imported.box_max.z)
+            );
+            createAnnotation(box, imported.description);
+          });
+          
+          updateAnnotationManager();
+          alert(`Successfully imported ${importedAnnotations.length} annotations.`);
+          
+        } catch (error) {
+          alert('Error importing annotations: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  function toggleManager() {
+    const manager = document.getElementById('annotation-manager');
+    const btn = document.querySelector('.manager-collapse-btn');
+    manager.classList.toggle('collapsed');
+    btn.textContent = manager.classList.contains('collapsed') ? '⮞' : '⮜';
+  }
+
   // --- Event Listeners & Render Loop ---
-  window.addEventListener('pointermove', onPointerMove);
-  window.addEventListener('pointerdown', onPointerDown);
+  threeContainer.addEventListener('pointermove', onPointerMove);
+  threeContainer.addEventListener('pointerdown', onPointerDown);
+  threeContainer.addEventListener('pointerup', onPointerUp);
   window.addEventListener('keydown', onKeyDown);
   
   const tempVec = new THREE.Vector3();
@@ -559,6 +1132,51 @@
     renderer.render(scene, camera);
   }
   animate();
+
+  // Resizer logic for tool panel (only affects #tool-panel)
+  const resizer = document.getElementById('resizer');
+  const toolPanel = document.getElementById('tool-panel');
+  let isResizing = false;
+  resizer.addEventListener('mousedown', function(e) {
+    isResizing = true;
+    document.body.style.cursor = 'ew-resize';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!isResizing) return;
+    const minWidth = 260;
+    const maxWidth = 700;
+    const mainRect = document.getElementById('main-container').getBoundingClientRect();
+    const mapWidth = document.getElementById('mapContainer').offsetWidth;
+    const resizerWidth = resizer.offsetWidth;
+    let newWidth = mainRect.right - mapWidth - resizerWidth - e.clientX;
+    if (newWidth < minWidth) newWidth = minWidth;
+    if (newWidth > maxWidth) newWidth = maxWidth;
+    toolPanel.style.width = newWidth + 'px';
+  });
+  document.addEventListener('mouseup', function(e) {
+    if (isResizing) {
+      isResizing = false;
+      document.body.style.cursor = '';
+    }
+  });
+
+  // After pointCloud and material are created, attach event listeners to sliders
+  function setupPointCloudControls() {
+    const pointSizeSlider = document.getElementById('pointSizeSlider');
+    const opacitySlider = document.getElementById('opacitySlider');
+    if (pointSizeSlider && material) {
+      pointSizeSlider.value = material.size;
+      pointSizeSlider.oninput = function() {
+        material.size = parseFloat(this.value);
+      };
+    }
+    if (opacitySlider && material) {
+      opacitySlider.value = material.opacity;
+      opacitySlider.oninput = function() {
+        material.opacity = parseFloat(this.value);
+      };
+    }
+  }
 </script>
 </body>
 </html> 
