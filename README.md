@@ -20,26 +20,9 @@ A next-generation, human-in-the-loop AI system for precipitation nowcasting. Thi
 
 ## System Architecture
 
-```mermaid
-flowchart TD
-    A[Data Input] --> B[NowcastNet Inference]
-    B --> C[Confidence Check]
-    C -- ">= threshold" --> D[Auto-Labeled Data]
-    C -- "< threshold" --> E[Human Review Module]
-    D --> F[Auto-Labeled Predictions DB]
-    E --> G[Human-Labeled Predictions DB]
-    F --> H[Retraining Pipeline]
-    G --> H
-    H -- "Retrain Model" --> B
+![System Architecture](docs/architecture.png)
 
-    %% Human-in-the-loop annotation branch
-    E -.-> I[3D Annotation Tool]
-    I -- "Export JSON" --> J[Annotation JSON]
-    J -- "Convert to Mask" --> K[Mask Generation Script]
-    K -- "Mask PNG" --> B
-
-    L[Raw Radar Data (PNG)] -.-> B
-```
+*System architecture: Human-in-the-loop, confidence-based workflow integrating 3D annotation, ML, and feedback.*
 
 ---
 
