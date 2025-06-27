@@ -1,46 +1,52 @@
-# Technical Report: Human-Physics Hybrid AI System
+# Technical Report: Human-Physics Hybrid AI System for Precipitation Nowcasting
 
-## Introduction & Motivation
+## 1. Motivation & Goals
 
-In my journey to push the boundaries of nowcasting, I realized that pure data-driven AI often misses the nuanced insights that human experts bring to the table. This project is my answer: a hybrid system that fuses human annotation with physics-inspired neural networks, aiming for skillful, interpretable, and adaptive precipitation nowcasting.
+Accurate precipitation nowcasting is critical for weather safety, hydrology, and climate research. Traditional AI models excel at pattern recognition but often lack physical interpretability, while physics-based models can be limited by data and complexity. This project aims to bridge the gap by:
+- Enabling **human-in-the-loop annotation** and correction of AI predictions
+- Providing a **modern, intuitive 3D annotation tool** for meteorological data
+- Seamlessly integrating human knowledge into the ML pipeline
 
-## System Design
+## 2. System Design
 
-The architecture is modular and feedback-driven. At its core, the system consists of:
-- An interactive 3D annotation tool for human input
-- Automated mask generation from annotations
-- A flexible data loader that feeds both radar data and annotation masks to the NowcastNet model
-- An evaluator that visualizes and compares predictions, ground truth, and human annotations
-- A feedback loop that empowers rapid iteration and improvement
+### 2.1. UI/Frontend
+- **3D Point Cloud Viewer**: Renders MRMS radar data in a browser using Three.js
+- **Annotation Tool**: Click-and-drag bounding box creation, labeling, and management
+- **Flexible Layout**: Resizable tool panel, always-visible map, and responsive design
+- **Annotation Management**: Add, edit, delete, search, import/export, and bulk operations
 
-![Architecture Diagram](architecture.png)
+### 2.2. Backend & Data Flow
+- **Python HTTP Server**: Handles annotation saving and static file serving
+- **Annotation Format**: JSON with bounding box coordinates and labels
+- **Mask Generation**: Python script converts annotation JSON to mask images for ML
 
-## Annotation Tool
+### 2.3. ML Integration
+- **NowcastNet**: Deep learning model for precipitation nowcasting
+- **Data Loader**: Feeds both radar frames and annotation masks to the model
+- **Evaluator**: Visualizes and compares predictions, ground truth, and annotations
 
-The browser-based 3D annotation tool is designed for ease of use and expressiveness. Users can:
-- Inspect radar point clouds in 3D
-- Draw bounding boxes and add descriptions
-- Export annotations as JSON for downstream processing
+## 3. Human-in-the-Loop Workflow
+1. **Visualize**: Load and explore 3D radar data
+2. **Annotate**: Mark regions of interest (e.g., storm fronts, river beds) with bounding boxes
+3. **Export**: Save annotations as JSON for reproducibility
+4. **Convert**: Generate mask images for ML training/validation
+5. **Train/Evaluate**: Use masks in NowcastNet pipeline
+6. **Compare & Refine**: Visualize results, compare with human annotations, and iterate
 
-*Demo GIF: (to be added)*
+## 4. Key Design Decisions
+- **Direct 3D Annotation**: Click-and-drag for intuitive bounding box creation
+- **Flexible, Modern UI**: Resizable panels and always-visible map for spatial context
+- **Server-Side Saving**: Ensures annotation reproducibility and easy integration
+- **Modular Data Flow**: Clear separation between annotation, mask generation, and ML pipeline
+- **Open Standards**: Uses JSON and PNG for interoperability
 
-## ML Integration Workflow
+## 5. Lessons Learned & Future Work
+- **User Experience**: Iterative UI improvements (resizing, panel layout, direct drawing) greatly enhance usability
+- **Integration**: Seamless data flow from annotation to ML is key for rapid experimentation
+- **Scalability**: Future work could include collaborative annotation, more annotation types (polygons, temporal), and real-time feedback from the ML model
+- **Extensibility**: The system can be adapted for other geospatial or scientific annotation tasks
 
-Annotations are converted to binary mask images using a simple script. These masks are then optionally loaded alongside radar data by the data loader. The NowcastNet model can thus be trained or evaluated with direct human supervision, enabling:
-- Supervised learning with human-labeled regions
-- Quantitative and qualitative comparison of predictions and annotations
-- A feedback loop where model results inform further annotation
-
-## Results & Insights
-
-The system produces side-by-side visualizations of ground truth, model predictions, and annotation masks. This makes it easy to spot where the model excels or needs improvement, and to iteratively refine both the model and the annotations.
-
-*Example comparison: (to be added)*
-
-Through this workflow, I've found that even a small amount of targeted human annotation can significantly improve model interpretability and performance in challenging cases.
-
-## Conclusion
-
-This project is a step toward more collaborative, transparent, and effective AI for scientific applications. By making human expertise a first-class citizen in the ML pipeline, we can build systems that are not only more accurate, but also more trustworthy and adaptable.
+## 6. Conclusion
+This project demonstrates a practical, creative approach to combining human expertise and AI for weather nowcasting. The open-source, modular design enables rapid iteration and collaboration, paving the way for more interpretable and effective AI systems in meteorology and beyond.
 
 If you have questions, ideas, or want to collaborate, I'd love to hear from you! 

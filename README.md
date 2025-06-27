@@ -1,19 +1,50 @@
 # Human-Physics Hybrid AI System for Precipitation Nowcasting
 
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ## Overview
-This project is a Human-Physics Hybrid AI System for precipitation nowcasting, featuring a modern 3D annotation tool and seamless ML integration. The system enables human-in-the-loop annotation, validation, and correction of AI predictions, bridging the gap between data-driven and physics-based approaches.
+A next-generation, human-in-the-loop AI system for precipitation nowcasting. This project combines a modern 3D annotation tool, seamless ML integration, and a feedback-driven workflow to bridge the gap between human expertise and neural network predictions.
+
+---
 
 ## Features
-- **3D Point Cloud Visualization**: Interactive, high-performance viewer for MRMS precipitation data.
+- **3D Point Cloud Visualization**: Explore and annotate radar data in a true 3D environment.
 - **Direct 3D Annotation**: Click and drag to draw bounding boxes, label features, and manage annotations.
-- **Flexible UI**: Resizable, modern tool panel and always-visible map for spatial context.
+- **Flexible, Modern UI**: Resizable tool panel, always-visible map, and responsive layout.
 - **Annotation Management**: Add, edit, delete, search, import/export, and bulk operations.
 - **Human-in-the-loop ML**: Annotations feed directly into the AI pipeline for training and validation.
 - **Server-Side Saving**: Annotations are saved to a dedicated directory for reproducibility.
 - **Easy Setup**: Minimal dependencies, simple Python server, and clear instructions.
 
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    subgraph Human
+      A[3D Annotation Tool] -- Export JSON --> B[Annotation JSON]
+    end
+    B -- Convert to Mask --> C[Mask Generation Script]
+    C -- Mask PNG --> D[Data Loader]
+    subgraph AI System
+      D -- Radar Frames & Masks --> E[NowcastNet Model]
+      E -- Predictions --> F[Evaluator]
+      F -- Visualize & Compare --> G[Results: GT, Prediction, Mask]
+    end
+    G -- Feedback --> A
+    D -- Load Radar Data --> H[Raw Radar Data (PNG)]
+    H -.-> D
+```
+
+---
+
 ## Demo
 ![Annotation Tool New UI](media/annotation_tool_new.png)
+
+*Want to add a GIF? Use a screen recorder and [ezgif.com](https://ezgif.com/video-to-gif) to create a GIF, then place it in `media/` and reference it here!*
+
+---
 
 ## Quick Start
 1. **Clone this repo & install requirements**
@@ -37,29 +68,60 @@ This project is a Human-Physics Hybrid AI System for precipitation nowcasting, f
 6. **Save/Export**
    - Click "Export JSON" to save annotations to the `annotations/` directory.
 
+---
+
+## Example Usage
+- **Convert annotations to masks:**
+  ```bash
+  python3 convert_annotations_to_masks.py --json annotations/your_annotations.json --output_dir data/dataset/mrms/annotation_masks
+  ```
+- **Run the ML pipeline:**
+  ```bash
+  cd code
+  python3 run.py --worker 1 --device cpu:0 --cpu_worker 1 --dataset_name radar --dataset_path ../data/dataset/mrms/figure --pretrained_model ../data/checkpoints/mrms_model.ckpt --gen_frm_dir ../results/us/ --num_save_samples 10 --model_name NowcastNet --annotation_mask_path ../data/dataset/mrms/annotation_masks
+  ```
+- **Visualize results:**
+  Check the results folder for side-by-side comparisons of ground truth, predictions, and your annotation masks.
+
+---
+
 ## How It Works
 - The annotation tool allows meteorologists and researchers to mark features in 3D radar data.
 - Annotations are saved as JSON and can be converted to masks for ML training.
 - The ML pipeline (NowcastNet) uses these masks for supervised learning and evaluation.
 - Results can be visualized and compared with human annotations for iterative improvement.
 
+---
+
 ## Example Results
 ![Comparison Example](media/comparison.png)
 
+---
+
 ## Technical Report
-For a deeper dive into the design and workflow, see [docs/technical_report.md](docs/technical_report.md)
+A brief technical report explaining the design, workflow, and key decisions is available at:
+- [docs/technical_report.md](docs/technical_report.md)
+
+---
 
 ## Large Files
 Due to GitHub's 100MB limit, download these files separately:
 - **Model Checkpoint**: Place in `data/checkpoints/mrms_model.ckpt`
 - **Point Cloud Data**: Place in `mrms_point_cloud.npy`
 
+---
+
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+## Contact
+For questions, suggestions, or collaboration, open an issue or contact [Your Name/Team] at [your.email@domain.com].
 
 ---
 
 If you have questions, ideas, or want to collaborate, don't hesitate to reach out. I hope this project inspires you to blend human insight with AI in your own work!
 
 ---
-MIT License 
