@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 # Human-Physics-Hybrid-AI-System
-=======
-# Human-Physics Hybrid AI System
 
 Welcome! This project is my take on blending human intuition and physics-based AI for next-level nowcasting. Here, you'll find not just code, but a workflow that puts human expertise right into the heart of machine learning.
 
@@ -71,10 +68,14 @@ flowchart TD
 ## 📄 Technical Report
 For a deeper dive into my design decisions and the hybrid workflow, see [docs/technical_report.pdf](docs/technical_report.pdf)
 
+## Large Files
+Download these files separately due to GitHub's 100MB limit:
+- [Model Checkpoint](your-link) (133 MB)
+- [Point Cloud Data](your-link) (43 MB)
+
 ---
 
 If you have questions, ideas, or want to collaborate, don't hesitate to reach out. I hope this project inspires you to blend human insight with AI in your own work!
 
 ---
 MIT License 
->>>>>>> 52e940c (Initial public release: Human-Physics Hybrid AI System with 3D annotation, ML integration, and documentation)
