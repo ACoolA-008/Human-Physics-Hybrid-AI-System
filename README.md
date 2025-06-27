@@ -21,20 +21,24 @@ A next-generation, human-in-the-loop AI system for precipitation nowcasting. Thi
 ## System Architecture
 
 ```mermaid
-graph TD
-    subgraph Human
-      A[3D Annotation Tool] -- Export JSON --> B[Annotation JSON]
-    end
-    B -- Convert to Mask --> C[Mask Generation Script]
-    C -- Mask PNG --> D[Data Loader]
-    subgraph AI System
-      D -- Radar Frames & Masks --> E[NowcastNet Model]
-      E -- Predictions --> F[Evaluator]
-      F -- Visualize & Compare --> G[Results: GT, Prediction, Mask]
-    end
-    G -- Feedback --> A
-    D -- Load Radar Data --> H[Raw Radar Data (PNG)]
-    H -.-> D
+flowchart TD
+    A[Data Input] --> B[NowcastNet Inference]
+    B --> C[Confidence Check]
+    C -- ">= threshold" --> D[Auto-Labeled Data]
+    C -- "< threshold" --> E[Human Review Module]
+    D --> F[Auto-Labeled Predictions DB]
+    E --> G[Human-Labeled Predictions DB]
+    F --> H[Retraining Pipeline]
+    G --> H
+    H -- "Retrain Model" --> B
+
+    %% Human-in-the-loop annotation branch
+    E -.-> I[3D Annotation Tool]
+    I -- "Export JSON" --> J[Annotation JSON]
+    J -- "Convert to Mask" --> K[Mask Generation Script]
+    K -- "Mask PNG" --> B
+
+    L[Raw Radar Data (PNG)] -.-> B
 ```
 
 ---
